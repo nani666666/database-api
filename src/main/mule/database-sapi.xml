@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="0166ea87-b29a-43e9-98e6-8d86e80af34c" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="aecf1900-4f42-42f2-9f36-7ab07f2abbd9" >
+		<db:oracle-connection host="localhost" user="system" password="system" instance="xe" />
+	</db:config>
+	<flow name="database-sapiFlow4" doc:id="83132e99-9496-48a5-830e-d2e61d7b14ae" >
+		<http:listener doc:name="Listener" doc:id="c84796fb-0086-41af-9237-72fb047188c5" config-ref="HTTP_Listener_config" path="/product" />
+		<flow-ref doc:name="Flow Reference" doc:id="5f07fb9c-4448-4591-82cf-1a5c0d5c3f0e" name="database-sapiFlow2" />
+		<choice doc:name="Choice" doc:id="ba4a0ed2-5795-46a4-b18b-a28b846c289f" >
+			<when expression='#[(attributes.method == "POST") and (!isEmpty(payload))]'>
+				<flow-ref doc:name="Flow Reference" doc:id="ff90d7a3-d338-47d1-ac48-666b2bd0c64e" name="database-sapiFlow"/>
+			</when>
+			<when expression="#[(!isEmpty(attributes.queryParams.name)) and (sizeOf(attributes.queryParams)&gt;0)]">
+				<flow-ref doc:name="Flow Reference" doc:id="0f2ca3cf-d8a2-4d42-95d3-43a6dfc51a91" name="database-sapiFlow3"/>
+			</when>
+			<otherwise>
+				<flow-ref doc:name="Flow Reference" doc:id="e01f6699-beb1-4d95-81e0-5ee7d9e56061" name="database-sapiFlow2"/>
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Logger" doc:id="1afcc28a-501f-4ee2-8f03-eac7d3415099" message="===end==="/>
+	</flow>
+	<flow name="database-sapiFlow3" doc:id="10dea593-77ff-4827-a8d7-d2d0328b7847" >
+		<set-variable value="#[now()]" doc:name="request time" doc:id="1fe253e1-552b-44fc-96fb-1f5b87732ddd" variableName="reqdt"/>
+		<set-variable value="#[attributes.queryParams.name]" doc:name="bramd name" doc:id="2829a6be-2b60-497f-935c-39ea636fd224" variableName="bname"/>
+		<db:select doc:name="Select" doc:id="06827790-01a7-4122-a58e-dc55d5ae46c5" config-ref="Database_Config">
+			<db:sql ><![CDATA[SELECT * FROM Data WHERE brand_name = :brandname]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	brandname: vars.bname
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="a51f29db-4af3-4431-8ccc-884b8eb3a97e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<flow-ref doc:name="Flow Reference" doc:id="65d934c8-6cac-4c39-9991-672cec57c2c2" name="database-sapiFlow1"/>
+	</flow>
+	<flow name="database-sapiFlow2" doc:id="3499183d-b802-4509-ab7d-7ccc2eeb704b">
+		<set-variable value="#[now()]" doc:name="request time" doc:id="11ac3586-4745-4b8d-b22a-d0849f44a6bb" variableName="reqdt" />
+		<db:select doc:name="Select" doc:id="84c5222b-d794-47ce-a113-e94ec5de3c81" config-ref="Database_Config">
+			<db:sql><![CDATA[SELECT * FROM Data]]></db:sql>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="8a608e66-38d3-484b-8e9b-799037583c29">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="Set Variable" doc:id="6e5d0524-7e16-414b-a62d-bdb131424b05" variableName="hold" />
+		<flow-ref doc:name="Flow Reference" doc:id="bc57c74e-bda2-447b-ab4b-1da84c18463e" name="database-sapiFlow1" />
+	</flow>
+	<flow name="database-sapiFlow" doc:id="778663ff-aa52-4660-b4b7-efeae76947bf" >
+		<set-variable value="#[now()]" doc:name="request time" doc:id="4a6361e5-2225-4ceb-a720-48da086ec1dd" variableName="reqdt"/>
+		<db:insert doc:name="addproduct" doc:id="8dde57fc-2bbe-48c4-9fcb-c4959b776ff1" config-ref="Database_Config">
+			<db:sql ><![CDATA[INSERT INTO Data (product_id,product_name,brand_name,offer_details) values
+(:PRODUCT_ID,:PRODUCT_NAME,:BRAND_NAME,:OFFER_PRICE)]]></db:sql>
+			<db:input-parameters ><![CDATA[#[output application/json
+---
+{
+	PRODUCT_ID:  payload.productId,
+	PRODUCT_NAME : payload.productname,
+	BRAND_NAME: payload.brandName,
+	OFFER_PRICE: payload.offerPrice
+	
+}]]]></db:input-parameters>
+		</db:insert>
+		<db:select doc:name="Select" doc:id="ea0c66d6-1b20-430b-ba89-3683f2808afa" config-ref="Database_Config">
+			<db:sql ><![CDATA[SELECT * FROM Data WHERE product_id = ( SELECT MAX(product_id) FROM Data )]]></db:sql>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="8be7ffc1-3dec-4667-bd54-29759af46e81" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload]" doc:name="Set Variable" doc:id="c22de210-436a-4dd1-a06d-b13feac94d42" variableName="hold"/>
+		<flow-ref doc:name="Flow Reference" doc:id="266d679d-4903-4538-9784-da3746da04f0" name="database-sapiFlow1"/>
+	</flow>
+	<flow name="database-sapiFlow1" doc:id="433c923d-7967-4a3d-9f8a-4ca4b4c801f2" >
+		<set-variable value="#[now()]" doc:name="response time" doc:id="8442bc07-9971-478a-b4b6-da5f5f1693e1" variableName="respdt"/>
+		<db:insert doc:name="Insert-auditlogs" doc:id="e7796241-e23a-4d69-8779-dabb959b5709" target="hold" config-ref="Database_Config">
+			<db:sql ><![CDATA[insert into audit_logs(reqtime,restime,reqmsg,resmsg) values(:req_time,:resp_time,:REQ_MSG,:RESP_MSG)]]></db:sql>
+			<db:input-parameters ><![CDATA[#[output application/json
+---
+{
+	req_time: vars.reqdt,
+	resp_time: vars.respdt,
+	REQ_MSG:"message requested",
+	RESP_MSG:write(payload,"application/json")
+}]]]></db:input-parameters>
+		</db:insert>
+		<logger level="INFO" doc:name="Logger" doc:id="f197722d-ae13-489e-94d6-5be0e48b25e9" message="===end==="/>
+	</flow>
+</mule>
